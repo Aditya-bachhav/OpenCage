@@ -97,6 +97,42 @@ def _longest_streak(values: Iterable[str | None]) -> int:
     return best
 
 
+def _entropy_from_counts(counts: Counter[str]) -> float:
+    total = sum(counts.values())
+    if total == 0:
+        return 0.0
+    entropy = 0.0
+    for value in counts.values():
+        probability = value / total
+        entropy -= probability * math.log2(probability)
+    return round(entropy, 4)
+
+
+def _summarize_preference_evolution(preference_history: list[dict]) -> dict:
+    """Summarize how preferences evolved across the session."""
+    if not preference_history:
+        return {}
+    
+    entropies = [p.get("entropy", 0.0) for p in preference_history]
+    top_weights = [p.get("top_preference", {}).get("weight", 0.0) for p in preference_history]
+    top_systems = [p.get("top_preference", {}).get("system_id") for p in preference_history]
+    
+    preference_changes = 0
+    for i in range(1, len(top_systems)):
+        if top_systems[i] != top_systems[i - 1] and top_systems[i] is not None:
+            preference_changes += 1
+    
+    return {
+        "mean_entropy": round(sum(entropies) / len(entropies), 4) if entropies else 0.0,
+        "min_entropy": round(min(entropies), 4) if entropies else 0.0,
+        "max_entropy": round(max(entropies), 4) if entropies else 0.0,
+        "mean_top_weight": round(sum(top_weights) / len(top_weights), 4) if top_weights else 0.0,
+        "max_top_weight": round(max(top_weights), 4) if top_weights else 0.0,
+        "preference_changes": preference_changes,
+        "final_top_system": top_systems[-1] if top_systems else None,
+    }
+
+
 def summarize_session(rows: list[dict]) -> dict:
     step_rows = [row for row in rows if row.get("type") == "step"]
     if not step_rows:
@@ -151,11 +187,17 @@ def run_session(seed: int, steps: int, log_path: Path, controller_name: str = "e
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.unlink(missing_ok=True)
     controller = make_controller(controller_name, seed)
+    
+    # Pass preference memory to emergent controller
+    if controller_name == "emergent":
+        controller.preference_memory = env.preference_memory
+    
     logger = SessionLogger(log_path)
 
     obs, info = env.reset(seed=seed)
     final_info = info
     completed_steps = 0
+    preference_evolution = []
 
     for step in range(steps):
         action = controller.choose_action(info)
@@ -174,12 +216,14 @@ def run_session(seed: int, steps: int, log_path: Path, controller_name: str = "e
                 "info": info,
             }
         )
+        preference_evolution.append(info.get("preferences", {}))
         final_info = info
         completed_steps = step + 1
         if terminated or truncated:
             break
 
     summary = summarize_session(logger.read_all())
+    summary["preference_evolution"] = _summarize_preference_evolution(preference_evolution)
     logger.write_summary({"seed": seed, "controller": controller_name, "steps": completed_steps, "summary": summary})
     return {"seed": seed, "steps": completed_steps, "controller": controller_name, "log_path": str(log_path), "summary": summary}
 

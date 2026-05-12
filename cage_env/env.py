@@ -19,6 +19,7 @@ from cage_env.objects import (
     make_wave_emitter,
 )
 from cage_env.physics import DT, agent_interact, distance, tick
+from cage_env.preference import PreferenceMemory
 
 MAX_STEPS = 4000
 ACTION_NAMES = ["noop", "move_left", "move_right", "move_up", "move_down", "inspect"]
@@ -42,9 +43,12 @@ class OscillationChamberEnv(gym.Env):
         self.agent = make_agent()
         self.systems = [make_pendulum(), make_spring(), make_resonance_plate(), make_rotating_wheel(), make_wave_emitter()]
         self.measurements = MeasurementEngine()
+        self.system_ids = [system.id for system in self.systems]
+        self.preference_memory = PreferenceMemory(system_ids=self.system_ids)
         self.step_count = 0
         self.episode = 0
         self._last_transfer = 0.0
+        self._last_dwell_start = {}  # track dwell start time per system
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -57,7 +61,9 @@ class OscillationChamberEnv(gym.Env):
         self.agent.y = float(self.np_random.uniform(4.4, 5.6))
         self.agent.energy = 1.0
         self._last_transfer = 0.0
+        self._last_dwell_start = {}
         self.measurements.reset()
+        # Don't reset preference_memory — allow persistence across episodes
         return self._build_obs(), self._info()
 
     def step(self, action: int):
@@ -75,9 +81,37 @@ class OscillationChamberEnv(gym.Env):
                 metrics = self.measurements.metrics.setdefault(nearest.id, SystemMetrics(system_id=nearest.id))
                 metrics.interactions += 1
                 metrics.energy_transferred += transfer
+                # Reinforce preference on successful interaction
+                self.preference_memory.reinforce_interaction(nearest.id, transfer, self.step_count)
 
         self._last_transfer = transfer
         self.measurements.observe(self.agent, self.systems, self.step_count)
+        
+        # Track preference reinforcement based on measurements
+        nearest_id = self.measurements.get_signals().nearest_system_id
+        if nearest_id is not None:
+            # Reinforce on revisit (entering dwell zone)
+            if nearest_id not in self._last_dwell_start:
+                self.preference_memory.reinforce_revisit(nearest_id, self.step_count)
+                self._last_dwell_start[nearest_id] = self.step_count
+            
+            # Reinforce dwell time
+            dwell_start = self._last_dwell_start.get(nearest_id, self.step_count)
+            dwell_duration = (self.step_count - dwell_start) * DT
+            self.preference_memory.reinforce_dwell(nearest_id, dwell_duration, self.step_count)
+            
+            # Reinforce on phase alignment
+            signals = self.measurements.get_signals()
+            phase_align = signals.phase_alignment.get(nearest_id, 0.0)
+            self.preference_memory.reinforce_phase_alignment(nearest_id, phase_align, self.step_count)
+        else:
+            # Clear dwell tracking when no longer in any dwell zone
+            self._last_dwell_start.clear()
+        
+        # Apply preference decay and update boredom
+        self.preference_memory.decay(self.step_count)
+        self.preference_memory.update_boredom(self.step_count)
+        
         reward = self._compute_reward(nearest, transfer)
         obs = self._build_obs()
         info = self._info()
@@ -129,4 +163,5 @@ class OscillationChamberEnv(gym.Env):
             "systems": [system.to_dict() for system in self.systems],
             "metrics": self.measurements.summary(),
             "last_transfer": self._last_transfer,
+            "preferences": self.preference_memory.summary(self.step_count),
         }
