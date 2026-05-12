@@ -139,12 +139,7 @@ def run_live(seed: int):
     return env, controller, obs, info
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Oscillation Chamber visualizer")
-    parser.add_argument("--replay", type=Path, help="Replay a JSONL session log")
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
-
+def run_visualizer(seed: int = 42, replay: Path | None = None):
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Oscillation Chamber")
@@ -152,7 +147,7 @@ def main():
     font = pygame.font.Font(None, 22)
     small_font = pygame.font.Font(None, 18)
 
-    replay_frames = load_replay(args.replay) if args.replay else []
+    replay_frames = load_replay(replay) if replay else []
     replay_mode = bool(replay_frames)
     frame_index = 0
     paused = False
@@ -161,7 +156,7 @@ def main():
 
     env = controller = obs = info = None
     if not replay_mode:
-        env, controller, obs, info = run_live(args.seed)
+        env, controller, obs, info = run_live(seed)
 
     running = True
     while running:
@@ -174,7 +169,7 @@ def main():
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_r and not replay_mode:
-                    env, controller, obs, info = run_live(args.seed)
+                    env, controller, obs, info = run_live(seed)
                     live_history.clear()
                     frame_index = 0
                 elif event.key in {pygame.K_EQUALS, pygame.K_PLUS}:
@@ -192,7 +187,7 @@ def main():
                     obs, reward, terminated, truncated, info = env.step(action)
                     live_history.append((env.agent.x, env.agent.y))
                     if terminated or truncated:
-                        env, controller, obs, info = run_live(args.seed)
+                        env, controller, obs, info = run_live(seed)
                         live_history.clear()
 
         frame_info = info
@@ -215,6 +210,15 @@ def main():
 
         pygame.display.flip()
         clock.tick(FPS)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Oscillation Chamber visualizer")
+    parser.add_argument("--replay", type=Path, help="Replay a JSONL session log")
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    run_visualizer(seed=args.seed, replay=args.replay)
 
     pygame.quit()
 

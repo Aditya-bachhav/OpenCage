@@ -20,6 +20,14 @@ The project now centers on one physically grounded phenomenon: periodic motion i
 python -m cage_env.evaluate --seed 42 --steps 1000
 ```
 
+## Run everything in order
+
+```bash
+python main.py
+```
+
+This first runs a deterministic evaluation session, prints the summary, and then opens the live visualizer.
+
 ## Visualize live
 
 ```bash

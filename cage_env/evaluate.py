@@ -3,10 +3,17 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
 
-from cage_env.controller import SignalResponder
-from cage_env.env import OscillationChamberEnv
-from cage_env.session_log import SessionLogger
+try:
+    from cage_env.controller import SignalResponder
+    from cage_env.env import OscillationChamberEnv
+    from cage_env.session_log import SessionLogger
+except ModuleNotFoundError:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    from cage_env.controller import SignalResponder
+    from cage_env.env import OscillationChamberEnv
+    from cage_env.session_log import SessionLogger
 
 
 def build_summary(final_info: dict) -> dict:
