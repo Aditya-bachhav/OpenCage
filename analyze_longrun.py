@@ -5,12 +5,13 @@ Directly computes and reports without waiting for external processes.
 """
 
 from pathlib import Path
-from cage_env.experiment import compare_controllers
+from cage_env.runner import compare_policies
 import json
 
 def generate_longrun_report():
     log_dir = Path("cage_env/logs_longrun")
     log_dir.mkdir(exist_ok=True)
+    master_log = Path("run_log.txt")
     
     print("=" * 80)
     print("PREFERENCE PERSISTENCE EXPERIMENT — LONG-RUN ANALYSIS")
@@ -24,10 +25,11 @@ def generate_longrun_report():
     
     # Run comparison with 10 seeds × 5000 steps
     seeds = list(range(100, 110))
-    comparison = compare_controllers(
+    comparison = compare_policies(
         seeds=seeds,
         steps=5000,
-        log_dir=log_dir / "longrun"
+        log_dir=log_dir / "longrun",
+        master_log_path=master_log,
     )
     
     print()

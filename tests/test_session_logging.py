@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cage_env.evaluate import run_session
+from cage_env.runner import run_session
 from cage_env.session_log import SessionLogger
 
 

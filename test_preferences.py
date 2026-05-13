@@ -2,17 +2,15 @@
 """Quick validation test for preference system."""
 
 from cage_env.env import OscillationChamberEnv
-from cage_env.controller import SignalResponder
+from cage_env.policy import EmergentPolicy
 
 def test_preference_system():
     print("Testing preference system integration...")
     
     # Create environment
     env = OscillationChamberEnv()
-    controller = SignalResponder(seed=42)
-    
-    # Link preferences
-    controller.preference_memory = env.preference_memory
+    controller = EmergentPolicy()
+    controller.reset(seed=42)
     
     # Initialize
     obs, info = env.reset(seed=42)
@@ -21,7 +19,7 @@ def test_preference_system():
     
     # Run a few steps
     for i in range(50):
-        action = controller.choose_action(info)
+        action = controller.act(obs)
         obs, reward, terminated, truncated, info = env.step(action)
     
     pref_state = info['preferences']

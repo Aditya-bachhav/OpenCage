@@ -16,10 +16,11 @@ Repository layout
 	- `cage_env/objects.py` — `OscillatingSystem` dataclass and factories (`make_pendulum`, `make_spring`, `make_resonance_plate`, `make_rotating_wheel`, `make_wave_emitter`, `make_agent`).
 	- `cage_env/physics.py` — low-level physics: phase update, positional transforms, energy decay, `agent_interact`, and utility functions like `phase_difference`.
 	- `cage_env/measurements.py` — `MeasurementEngine` and `SystemMetrics`: computes raw signals and summary metrics (visits, dwell time, revisit intervals, phase alignment, attraction scores).
-	- `cage_env/controller.py` — `SignalResponder` (emergent controller) and simple controllers used by experiments.
+	- `cage_env/policy.py` — `Policy` protocol plus `RandomPolicy`, `HeuristicPolicy`, and `EmergentPolicy`.
+	- `cage_env/runner.py` — policy-driven session runner, summarization, and cross-seed comparison harness.
 	- `cage_env/session_log.py` — `SessionLogger`: append-only JSONL session records (per-step + summary).
 	- `cage_env/visualize.py` — live visualizer and replay UI (pygame) showing systems, trajectory, attraction bars and metrics.
-	- `cage_env/experiment.py` — experiment harness: `run_session`, `run_multi_seed`, `aggregate_runs`, `compare_controllers` and `summarize_session`.
+	- `cage_env/experiment.py` — compatibility wrapper that re-exports the runner API.
 	- `cage_env/evaluate.py` — CLI wrapper for the experiment harness (convenience entrypoint).
 
 Quick start
@@ -35,13 +36,13 @@ pip install -r requirements.txt
 2. Run a short reproducible session (writes a JSONL log):
 
 ```bash
-python -m cage_env.evaluate --controller emergent --seeds 42 --steps 240 --log-dir cage_env/logs/emergent
+python -m cage_env.evaluate --policy emergent --seeds 42 --steps 240 --log-dir cage_env/logs/emergent
 ```
 
 3. Compare controllers across multiple seeds (aggregates metrics):
 
 ```bash
-python -m cage_env.evaluate --controller all --seeds 42 43 44 --steps 240
+python -m cage_env.evaluate --policy all --seeds 42 43 44 --steps 240
 ```
 
 4. Run the launcher which performs the comparison then opens the visualizer:
@@ -92,7 +93,7 @@ How to interpret results
 
 Development notes & extending the project
 ---------------------------------------
-- Add new controllers by implementing a small class with a `choose_action(info: dict) -> int` API and register it in `cage_env/experiment.py::make_controller`.
+- Add new policies by implementing `reset()`, `act(observation)`, and optional `update(feedback)` in `cage_env/policy.py`, then register them in `cage_env/runner.py::make_policy`.
 - Add new systems by creating a factory in `cage_env/objects.py` and ensuring `physics.tick` interprets its `kind`.
 - To attach richer rewards, edit `OscillationChamberEnv._compute_reward` in `cage_env/env.py`; keep in mind experiments rely on deterministic seeds.
 

@@ -9,13 +9,13 @@ import sys
 import pygame
 
 try:
-    from cage_env.controller import SignalResponder
     from cage_env.env import OscillationChamberEnv
+    from cage_env.policy import EmergentPolicy
     from cage_env.session_log import SessionLogger
 except ModuleNotFoundError:
     sys.path.append(str(Path(__file__).resolve().parent.parent))
-    from cage_env.controller import SignalResponder
     from cage_env.env import OscillationChamberEnv
+    from cage_env.policy import EmergentPolicy
     from cage_env.session_log import SessionLogger
 
 
@@ -134,7 +134,8 @@ def load_replay(log_path: Path) -> list[dict]:
 
 def run_live(seed: int):
     env = OscillationChamberEnv()
-    controller = SignalResponder(seed=seed)
+    controller = EmergentPolicy()
+    controller.reset(seed)
     obs, info = env.reset(seed=seed)
     return env, controller, obs, info
 
@@ -183,7 +184,7 @@ def run_visualizer(seed: int = 42, replay: Path | None = None):
                 info = replay_frames[frame_index]["info"] if replay_frames else info
             else:
                 for _ in range(max(1, int(speed))):
-                    action = controller.choose_action(info)
+                    action = controller.act(obs)
                     obs, reward, terminated, truncated, info = env.step(action)
                     live_history.append((env.agent.x, env.agent.y))
                     if terminated or truncated:
